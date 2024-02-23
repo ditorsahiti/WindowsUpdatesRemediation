@@ -91,7 +91,7 @@ if ($pendingPackages -ne $null) {
         "SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\SessionsPending"
     )
 
-    # Function to modify ACLs, safely check and delete subkeys, then delete the main key
+    # Function to safely check and delete subkeys, then delete the main key
     function ModifyAndDeleteRegKey {
         param(
             [string]$regPath
