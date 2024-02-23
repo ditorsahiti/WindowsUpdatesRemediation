@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 This script checks for pending Windows Update packages and performs actions based on the presence of stuck updates.
 
@@ -16,11 +16,29 @@ Date Created: 2023-12-12
 Author: Ditor Sahiti
 #>
 
+# Set log file path
+$logFilePath = "C:\Windows\Temp\WindowsUpdateRemediation.log"
+
+# Function to write log entries
+function Write-Log {
+    param(
+        [string]$Message
+    )
+
+    $TimeStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $LogEntry = "$TimeStamp - $Message"
+    Add-Content -Path $logFilePath -Value $LogEntry
+}
+
+# Log script start
+Write-Log -Message "Script execution started."
+
 $pendingPackages = dism /online /get-packages /format:table | Select-String "Pending" | ForEach-Object { $_.ToString().Split('|')[0].Trim() }
 
 # Check if $pendingPackages is not null
 if ($pendingPackages -ne $null) {
     Write-Host "PendingPackages is present. Executing the script."
+    Write-Log -Message "Pending Windows Update packages found. Script execution started."
 
     # Define registry paths to check
     $registryPaths = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing"
@@ -43,6 +61,7 @@ if ($pendingPackages -ne $null) {
                                 # Remove the value
                                 Remove-ItemProperty -Path $item.PSPath -Name $valueName -Force -ErrorAction SilentlyContinue
                                 Write-Host "Removed value $valueName in $($item.PSPath)" 
+                                Write-Log -Message "Removed value $valueName in $($item.PSPath)"
                             }
                         }
                     }
@@ -53,6 +72,7 @@ if ($pendingPackages -ne $null) {
                             # Remove the key
                             Remove-Item -Path $item.PSPath -Recurse -Force -ErrorAction SilentlyContinue
                             Write-Host "Removed key $($item.PSPath)" 
+                            Write-Log -Message "Removed key $($item.PSPath)"
                         }
                     }
                 }
@@ -60,9 +80,9 @@ if ($pendingPackages -ne $null) {
         }
         else {
             Write-Host "Path $path does not exist."
+            Write-Log -Message "Path $path does not exist."
         }
     }
-
 
     # Define the paths for the registry keys
     $registryPaths = @(
@@ -88,18 +108,22 @@ if ($pendingPackages -ne $null) {
                     $subRegKeyPath = "$regPath\$subKey"
                     $localMachineKey.DeleteSubKeyTree($subRegKeyPath)
                     Write-Host "Successfully deleted subkey: $subRegKeyPath"
+                    Write-Log -Message "Successfully deleted subkey: $subRegKeyPath"
                 }
 
                 # Delete the main key
                  $localMachineKey.DeleteSubKeyTree($regPath)
                  Write-Host "Successfully deleted main registry key: $regPath"
+                 Write-Log -Message "Successfully deleted main registry key: $regPath"
 
                 $regKey.Close()
             } else {
                 Write-Host "Registry key does not exist or cannot be accessed: $regPath"
+                Write-Log -Message "Registry key does not exist or cannot be accessed: $regPath"
             }
         } catch {
             Write-Host "Failed to delete registry key: $regPath. Error: $_"
+            Write-Log -Message "Failed to delete registry key: $regPath. Error: $_"
         }
     }
 
@@ -113,40 +137,16 @@ if ($pendingPackages -ne $null) {
     if (Test-Path $RebootPendingfilePath) {
         Remove-Item -Path $RebootPendingfilePath -Force
         Write-Host "File removed."
+        Write-Log -Message "File $RebootPendingfilePath removed."
     } else {
         Write-Host "Pending.XML File does not exist, no action taken." -ForegroundColor green
-    }
-
-    # Get the list of software updates
-    $UpdateList = Get-WmiObject -Namespace "root\ccm\clientsdk" -Class CCM_SoftwareUpdate
-
-    #
-    foreach ($Update in $UpdateList)
-    {
-        # Search for the CAB file in the ccmcache directory
-        # We use a wildcard pattern to match any CAB file that contains the ArticleID
-        $CABFilePaths = Get-ChildItem -Path C:\Windows\ccmcache\ -Filter "*$($Update.ArticleID)*.cab" -Recurse -ErrorAction SilentlyContinue
-   
-        foreach ($CABFilePath in $CABFilePaths)
-        {
-            if ($CABFilePath)
-            {
-                # Construct the DISM command
-                Write-Host "Installing update: $($CABFilePath.Name)..."
-                Write-Host "The installation process can take 15-30 minutes, depending on the size of a Cumulative Update. The progress can be tracked in C:\Windows\Logs\DISM\dism.log"
-
-                $DISMCommand = "DISM /Add-Package /Online /PackagePath:`"$($CABFilePath.FullName)`" /Quiet /NoRestart"
-                # Execute the DISM command to Install the Updates
-                Invoke-Expression $DISMCommand
-                Write-Host "Installed update: $($CABFilePath.Name)"
-            }
-            else
-            {
-                Write-Host "CAB file for update $($Update.ArticleID) not found."
-            }
-        }
+        Write-Log -Message "Pending.XML File does not exist, no action taken."
     }
 
 } else {
     write-Host "No Pending Windows Updates found. The script will not be executed."
+    Write-Log -Message "No Pending Windows Updates found. The script will not be executed."
 }
+
+# Log script end
+Write-Log -Message "Script execution completed."
