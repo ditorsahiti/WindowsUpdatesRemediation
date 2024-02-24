@@ -135,7 +135,7 @@ if ($pendingPackages -ne $null) {
     #Check for RebootPendingfilePath Key and remove it if present.
     $RebootPendingfilePath = "C:\Windows\Winsxs\Pending.xml"
     if (Test-Path $RebootPendingfilePath) {
-        Remove-Item -Path $RebootPendingfilePath -Force
+        Remove-Item -Path $RebootPendingfilePath -Force -ErrorAction SilentlyContinue
         Write-Host "File removed."
         Write-Log -Message "File $RebootPendingfilePath removed."
     } else {
